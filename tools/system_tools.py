@@ -48,6 +48,7 @@ def get_stats_snapshot() -> dict:
         "battery": battery.percent if battery else None,
         "time": datetime.now().strftime("%I:%M %p"),
     }
+<<<<<<< HEAD
 
 
 def get_system_specs() -> str:
@@ -178,3 +179,5 @@ def get_system_specs() -> str:
         return "Could not retrieve system specifications."
 
     return "System Specifications:\n" + "\n".join(f"• {line}" for line in lines)
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06

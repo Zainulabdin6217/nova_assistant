@@ -12,8 +12,11 @@ from voice.recorder import Recorder
 from voice.text_to_speech import speaker
 from graph.workflow import is_confirmation_request, TIMER_MARKER
 from utils.workers import CommandWorker, TranscriptionWorker, StatsWorker, WeatherWorker
+<<<<<<< HEAD
 from voice.wake_word import WakeWordWorker
 from utils.startup import enable_startup, disable_startup, is_startup_enabled
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 from database.database import db
 
 STATUS_COLORS = {
@@ -63,10 +66,15 @@ class MainWindow(QMainWindow):
         self._refresh_history()
 
         self._set_status("Idle")
+<<<<<<< HEAD
         self._append("NOVA", "Hello! I'm NOVA. Type or speak a command — or just say Hey NOVA!")
         self._check_api_key()
         self._init_startup_btn()
         self._start_wake_word()
+=======
+        self._append("NOVA", "Hello! I'm NOVA. Type or speak a command.")
+        self._check_api_key()
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 
     # ── UI ───────────────────────────────────────────────────────────────────
     def _build_ui(self):
@@ -135,9 +143,12 @@ class MainWindow(QMainWindow):
         clr_btn.setObjectName("ClearButton")
         clr_btn.clicked.connect(self._on_clear)
         act.addWidget(clr_btn)
+<<<<<<< HEAD
         self._startup_btn = QPushButton()
         self._startup_btn.clicked.connect(self._toggle_startup)
         act.addWidget(self._startup_btn)
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
         act.addStretch()
         left.addLayout(act)
 
@@ -285,6 +296,7 @@ class MainWindow(QMainWindow):
 
     def _check_api_key(self):
         from utils import llm_brain
+<<<<<<< HEAD
         provider = llm_brain.active_provider()
         if provider == "openai":
             self._append("NOVA", "✓ Using OpenAI (gpt-4o-mini). Ready!")
@@ -297,6 +309,12 @@ class MainWindow(QMainWindow):
                 "  • Add OPENAI_API_KEY to your .env file, OR\n"
                 "  • Install Ollama from ollama.com and run: ollama pull llama3.2:3b"
             )
+=======
+        if llm_brain.is_ready():
+            self._append("NOVA", "✓ OpenAI connected. Ready!")
+        else:
+            self._append("NOVA", "⚠ Add OPENAI_API_KEY to your .env file and restart.")
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 
     # ── Send / handle ────────────────────────────────────────────────────────
     def _on_send(self):
@@ -327,14 +345,20 @@ class MainWindow(QMainWindow):
             speaker.stop()
             self._append("NOVA", "Stopped speaking.")
             self._set_status("Idle")
+<<<<<<< HEAD
             self._resume_wake()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
             return
 
         if response == "__CLEAR_CHAT__":
             self.chat_area.clear()
             self._append("NOVA", "Chat cleared.")
             self._set_status("Idle")
+<<<<<<< HEAD
             self._resume_wake()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
             return
 
         # Timer
@@ -347,7 +371,10 @@ class MainWindow(QMainWindow):
             speaker.speak(label)
             self._start_timer(secs, label)
             self._set_status("Idle")
+<<<<<<< HEAD
             self._resume_wake()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
             return
 
         # Confirmation request
@@ -355,7 +382,10 @@ class MainWindow(QMainWindow):
         if is_confirm:
             self._set_status("Idle")
             self._show_confirm_dialog(intent, target, orig_args)
+<<<<<<< HEAD
             # wake word resumes after confirm dialog finishes in _on_done again
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
             return
 
         self._set_status("Speaking")
@@ -363,7 +393,10 @@ class MainWindow(QMainWindow):
         self._refresh_history()
         speaker.speak(response)
         self._set_status("Idle")
+<<<<<<< HEAD
         self._resume_wake()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 
     def _show_confirm_dialog(self, intent, target, orig_args):
         box = QMessageBox(self)
@@ -380,7 +413,10 @@ class MainWindow(QMainWindow):
         self._set_enabled(True)
         self._set_status("Error")
         self._append("NOVA", f"Error: {err}")
+<<<<<<< HEAD
         self._resume_wake()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 
     def _set_enabled(self, enabled: bool):
         self.send_btn.setEnabled(enabled)
@@ -470,6 +506,7 @@ class MainWindow(QMainWindow):
             lbl.setWordWrap(True)
             self._hist_layout.insertWidget(self._hist_layout.count() - 1, lbl)
 
+<<<<<<< HEAD
     # ── Wake word ────────────────────────────────────────────────────────────
     def _start_wake_word(self):
         self.wake_worker = WakeWordWorker()
@@ -524,13 +561,18 @@ class MainWindow(QMainWindow):
         self._append("NOVA", msg)
         self._init_startup_btn()
 
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
     # ── Cleanup ──────────────────────────────────────────────────────────────
     def real_quit(self):
         self.stats_worker.stop()
         self.wx_worker.stop()
+<<<<<<< HEAD
         if hasattr(self, 'wake_worker'):
             self.wake_worker.stop()
             self.wake_worker.wait(400)
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
         self.stats_worker.wait(400)
         self.wx_worker.wait(400)
         speaker.stop()

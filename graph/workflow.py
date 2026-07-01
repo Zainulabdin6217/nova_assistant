@@ -7,7 +7,10 @@ from utils.command_parser import needs_confirmation
 from utils import llm_brain
 from database.database import db
 
+<<<<<<< HEAD
 from utils.startup import enable_startup, disable_startup
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
 from tools import (
     application_tools, browser_tools, system_tools,
     file_tools, note_tools, power_tools, info_tools,
@@ -123,8 +126,11 @@ def execute_tool(state: NovaState) -> dict:
             response = ai_tools.search_phind(args or "")
 
         # ── System stats ─────────────────────────────────────
+<<<<<<< HEAD
         elif intent == "get_system_specs":
             response = system_tools.get_system_specs()
+=======
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
         elif intent == "show_cpu":
             response = system_tools.get_cpu_usage()
         elif intent == "show_ram":
@@ -140,6 +146,7 @@ def execute_tool(state: NovaState) -> dict:
         elif intent == "get_disk_usage":
             response = info_tools.get_disk_usage()
 
+<<<<<<< HEAD
         # ── File ops — real Windows paths ────────────────────────────
         elif intent == "generate_and_write_file":
             response = file_tools.generate_and_write_file(
@@ -173,6 +180,57 @@ def execute_tool(state: NovaState) -> dict:
             response = file_tools.rename_file(a.get("old_name") or "", a.get("new_name") or "", a.get("location", "desktop"))
         elif intent == "search_in_files":
             response = file_tools.search_in_files(a.get("keyword") or args or "", a.get("location", "desktop"))
+=======
+        # ── Basic file ops ────────────────────────────────────
+        elif intent == "create_folder":
+            response = file_tools.create_folder(a.get("name") or args or "New Folder")
+        elif intent == "create_file":
+            response = file_tools.create_text_file(a.get("name") or args or "untitled")
+        elif intent == "read_file":
+            response = file_tools.read_text_file(
+                a.get("name") or args or "",
+                a.get("location", "workspace"),
+            )
+        elif intent == "list_files":
+            response = file_tools.list_files(a.get("location", "workspace"))
+        elif intent == "delete_file":
+            response = file_tools.delete_file(
+                a.get("name") or args or "",
+                a.get("location", "workspace"),
+            )
+
+        # ── Advanced file ops ─────────────────────────────────
+        elif intent == "write_to_file":
+            response = file_tools.write_to_file(
+                a.get("name") or "",
+                a.get("content") or "",
+            )
+        elif intent == "append_to_file":
+            response = file_tools.append_to_file(
+                a.get("name") or "",
+                a.get("content") or "",
+            )
+        elif intent == "move_file":
+            response = file_tools.move_file(
+                a.get("name") or "",
+                a.get("source", "workspace"),
+                a.get("destination", "workspace"),
+            )
+        elif intent == "copy_file":
+            response = file_tools.copy_file(
+                a.get("name") or "",
+                a.get("source", "workspace"),
+                a.get("destination", "workspace"),
+            )
+        elif intent == "rename_file":
+            response = file_tools.rename_file(
+                a.get("old_name") or "",
+                a.get("new_name") or "",
+            )
+        elif intent == "search_in_files":
+            response = file_tools.search_in_files(a.get("keyword") or args or "")
+
+>>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
         # ── Notes ────────────────────────────────────────────
         elif intent == "create_note":
             response = note_tools.create_note(a.get("content") or args or "")
