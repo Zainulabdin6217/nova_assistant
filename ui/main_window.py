@@ -2,21 +2,18 @@ import json
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QLineEdit, QPushButton, QMessageBox, QFrame,
-    QScrollArea, QApplication, QSystemTrayIcon, QMenu,
+    QScrollArea, QApplication, QSystemTrayIcon, QMenu, QCheckBox,
 )
-from PySide6.QtCore  import Qt, QTimer
-from PySide6.QtGui   import QFont, QPixmap, QPainter, QColor, QIcon, QAction
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont, QPixmap, QPainter, QColor, QIcon, QAction
 
 from ui.styles import DARK_THEME
 from voice.recorder import Recorder
 from voice.text_to_speech import speaker
+from voice.wake_word import WakeWordWorker
 from graph.workflow import is_confirmation_request, TIMER_MARKER
 from utils.workers import CommandWorker, TranscriptionWorker, StatsWorker, WeatherWorker
-<<<<<<< HEAD
-from voice.wake_word import WakeWordWorker
-from utils.startup import enable_startup, disable_startup, is_startup_enabled
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+from utils.hotkey import HotkeyWorker, stop_all_hotkeys
 from database.database import db
 
 STATUS_COLORS = {
@@ -31,7 +28,7 @@ STATUS_COLORS = {
 }
 
 
-def _make_tray_icon() -> QIcon:
+def _make_icon() -> QIcon:
     pix = QPixmap(32, 32)
     pix.fill(Qt.transparent)
     p = QPainter(pix)
@@ -52,29 +49,32 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("NOVA — Desktop Voice Assistant")
         self.resize(1020, 660)
         self.setStyleSheet(DARK_THEME)
+        self.setWindowIcon(_make_icon())
 
         self.recorder        = Recorder()
         self._active_workers = []
         self._last_raw       = ""
         self._timer_secs     = 0
         self._timer_label    = None  # set in _build_ui
+        self._recording_now  = False
 
         self._build_ui()
         self._build_tray()
         self._start_stats()
         self._start_weather()
+        self._start_hotkey()
+        self._start_wake_word()
         self._refresh_history()
 
         self._set_status("Idle")
-<<<<<<< HEAD
-        self._append("NOVA", "Hello! I'm NOVA. Type or speak a command — or just say Hey NOVA!")
+        self._greet()
         self._check_api_key()
-        self._init_startup_btn()
-        self._start_wake_word()
-=======
-        self._append("NOVA", "Hello! I'm NOVA. Type or speak a command.")
-        self._check_api_key()
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+
+    # ── Greeting ─────────────────────────────────────────────────────────────
+    def _greet(self):
+        msg = "Hi! I'm NOVA. Press Ctrl+Space anywhere or say 'Hey NOVA' to give a command."
+        self._append("NOVA", msg)
+        QTimer.singleShot(500, lambda: speaker.speak(msg))
 
     # ── UI ───────────────────────────────────────────────────────────────────
     def _build_ui(self):
@@ -88,7 +88,6 @@ class MainWindow(QMainWindow):
         left = QVBoxLayout()
         left.setSpacing(8)
 
-        # header
         hdr = QHBoxLayout()
         title = QLabel("NOVA")
         title.setObjectName("TitleLabel")
@@ -99,18 +98,17 @@ class MainWindow(QMainWindow):
         hdr.addWidget(self.status_label)
         left.addLayout(hdr)
 
-        # chat
         self.chat_area = QTextEdit()
         self.chat_area.setObjectName("ChatArea")
         self.chat_area.setReadOnly(True)
         left.addWidget(self.chat_area, stretch=1)
 
-        # countdown timer label (hidden by default)
+        # countdown timer label
         self._timer_label = QLabel("")
         self._timer_label.setAlignment(Qt.AlignCenter)
         self._timer_label.setStyleSheet(
-            "color:#fdcb6e; font-size:18px; font-weight:700; padding:4px; background:#1a1a2e;"
-            "border-radius:8px; border:1px solid #2a2a45;"
+            "color:#fdcb6e;font-size:18px;font-weight:700;padding:4px;"
+            "background:#1a1a2e;border-radius:8px;border:1px solid #2a2a45;"
         )
         self._timer_label.hide()
         left.addWidget(self._timer_label)
@@ -118,7 +116,7 @@ class MainWindow(QMainWindow):
         # input row
         inp = QHBoxLayout()
         self.input_box = QLineEdit()
-        self.input_box.setPlaceholderText("Type a command…")
+        self.input_box.setPlaceholderText("Type a command… or press Ctrl+Space to speak")
         self.input_box.returnPressed.connect(self._on_send)
         inp.addWidget(self.input_box, stretch=1)
 
@@ -129,6 +127,7 @@ class MainWindow(QMainWindow):
         self.mic_btn = QPushButton("🎙")
         self.mic_btn.setObjectName("MicButton")
         self.mic_btn.clicked.connect(self._on_mic)
+        self.mic_btn.setToolTip("Click to record, or press Ctrl+Space anywhere")
         inp.addWidget(self.mic_btn)
         left.addLayout(inp)
 
@@ -143,12 +142,18 @@ class MainWindow(QMainWindow):
         clr_btn.setObjectName("ClearButton")
         clr_btn.clicked.connect(self._on_clear)
         act.addWidget(clr_btn)
-<<<<<<< HEAD
+
+        # Wake word toggle checkbox
+        self._wake_cb = QCheckBox("Hey NOVA (wake word)")
+        self._wake_cb.setStyleSheet("color:#8892b0;font-size:12px;padding-left:4px;")
+        self._wake_cb.setToolTip("Enable to say 'Hey NOVA' to activate (uses more CPU)")
+        self._wake_cb.stateChanged.connect(self._on_wake_toggle)
+        act.addWidget(self._wake_cb)
+
+        # Startup toggle
         self._startup_btn = QPushButton()
         self._startup_btn.clicked.connect(self._toggle_startup)
         act.addWidget(self._startup_btn)
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
         act.addStretch()
         left.addLayout(act)
 
@@ -161,22 +166,20 @@ class MainWindow(QMainWindow):
         rl = QVBoxLayout(right)
         rl.setSpacing(4)
 
-        # Weather section
         wx_lbl = QLabel("WEATHER")
         wx_lbl.setObjectName("SectionLabel")
         rl.addWidget(wx_lbl)
 
-        self.wx_city  = QLabel("—")
+        self.wx_city = QLabel("—")
         self.wx_city.setObjectName("StatLabel")
         rl.addWidget(self.wx_city)
-        self.wx_temp  = QLabel("—")
+        self.wx_temp = QLabel("—")
         self.wx_temp.setObjectName("StatValue")
         rl.addWidget(self.wx_temp)
-        self.wx_desc  = QLabel("—")
+        self.wx_desc = QLabel("—")
         self.wx_desc.setObjectName("StatLabel")
         rl.addWidget(self.wx_desc)
 
-        # System section
         sys_lbl = QLabel("SYSTEM")
         sys_lbl.setObjectName("SectionLabel")
         rl.addWidget(sys_lbl)
@@ -185,7 +188,6 @@ class MainWindow(QMainWindow):
         self.battery_val = self._stat_row(rl, "Battery")
         self.time_val    = self._stat_row(rl, "Time")
 
-        # History section
         hist_lbl = QLabel("RECENT COMMANDS")
         hist_lbl.setObjectName("SectionLabel")
         rl.addWidget(hist_lbl)
@@ -215,44 +217,40 @@ class MainWindow(QMainWindow):
         layout.addLayout(row)
         return val
 
-    # ── System tray ─────────────────────────────────────────────────────────
+    # ── System tray ──────────────────────────────────────────────────────────
     def _build_tray(self):
         self.tray = QSystemTrayIcon(self)
-        self.tray.setIcon(_make_tray_icon())
-        self.tray.setToolTip("NOVA Voice Assistant")
-
+        self.tray.setIcon(_make_icon())
+        self.tray.setToolTip("NOVA — Press Ctrl+Space to activate")
         menu = QMenu()
-        open_action = QAction("Open NOVA", self)
-        open_action.triggered.connect(self.show)
-        quit_action = QAction("Quit", self)
-        quit_action.triggered.connect(QApplication.quit)
-        menu.addAction(open_action)
+        open_a = QAction("Open NOVA", self)
+        open_a.triggered.connect(self.show)
+        quit_a = QAction("Quit", self)
+        quit_a.triggered.connect(self.real_quit)
+        menu.addAction(open_a)
         menu.addSeparator()
-        menu.addAction(quit_action)
-
+        menu.addAction(quit_a)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self.show()
-            self.raise_()
+            self.show(); self.raise_()
 
     def closeEvent(self, event):
         event.ignore()
         self.hide()
         self.tray.showMessage(
-            "NOVA", "Still running in the system tray. Right-click the icon to quit.",
+            "NOVA", "Running in tray — Ctrl+Space to activate. Right-click icon to quit.",
             QSystemTrayIcon.MessageIcon.Information, 2000,
         )
 
-    # ── Countdown timer ──────────────────────────────────────────────────────
+    # ── Countdown timer ───────────────────────────────────────────────────────
     def _start_timer(self, seconds: int, label: str):
         self._timer_secs = seconds
         self._timer_label.setText(f"⏱ {label}")
         self._timer_label.show()
-
         self._qt_timer = QTimer(self)
         self._qt_timer.setInterval(1000)
         self._qt_timer.timeout.connect(self._tick_timer)
@@ -263,24 +261,22 @@ class MainWindow(QMainWindow):
         if self._timer_secs <= 0:
             self._qt_timer.stop()
             self._timer_label.setText("⏱ Timer done!")
-            self._append("NOVA", "⏰ Timer finished!")
-            speaker.speak("Timer done!")
+            done_msg = "Timer finished!"
+            self._append("NOVA", f"⏰ {done_msg}")
+            speaker.speak(done_msg)
             QTimer.singleShot(4000, self._timer_label.hide)
         else:
             m, s = divmod(self._timer_secs, 60)
             h, m = divmod(m, 60)
-            if h:
-                txt = f"⏱ {h:02d}:{m:02d}:{s:02d}"
-            else:
-                txt = f"⏱ {m:02d}:{s:02d}"
+            txt = f"⏱ {h:02d}:{m:02d}:{s:02d}" if h else f"⏱ {m:02d}:{s:02d}"
             self._timer_label.setText(txt)
 
-    # ── Status + chat helpers ────────────────────────────────────────────────
+    # ── Status + chat ─────────────────────────────────────────────────────────
     def _set_status(self, status: str):
         self.status_label.setText(status)
         color = STATUS_COLORS.get(status, "#6c5ce7")
         self.status_label.setStyleSheet(
-            f"background-color:#1a1a2e;color:{color};padding:6px 14px;"
+            f"background:#1a1a2e;color:{color};padding:6px 14px;"
             f"border-radius:14px;font-weight:600;"
         )
 
@@ -296,27 +292,17 @@ class MainWindow(QMainWindow):
 
     def _check_api_key(self):
         from utils import llm_brain
-<<<<<<< HEAD
         provider = llm_brain.active_provider()
         if provider == "openai":
-            self._append("NOVA", "✓ Using OpenAI (gpt-4o-mini). Ready!")
+            msg = "✓ Using OpenAI (gpt-4o-mini). Ready!"
         elif provider == "ollama":
-            self._append("NOVA", "✓ Using local Ollama (llama3.2:3b) — free & offline. Ready!")
+            msg = "✓ Using local Ollama. Ready!"
         else:
-            self._append(
-                "NOVA",
-                "⚠ No AI provider found. Either:\n"
-                "  • Add OPENAI_API_KEY to your .env file, OR\n"
-                "  • Install Ollama from ollama.com and run: ollama pull llama3.2:3b"
-            )
-=======
-        if llm_brain.is_ready():
-            self._append("NOVA", "✓ OpenAI connected. Ready!")
-        else:
-            self._append("NOVA", "⚠ Add OPENAI_API_KEY to your .env file and restart.")
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+            msg = "⚠ No AI provider. Add OPENAI_API_KEY to .env or install Ollama."
+        self._append("NOVA", msg)
+        self._init_startup_btn()
 
-    # ── Send / handle ────────────────────────────────────────────────────────
+    # ── Send / handle ──────────────────────────────────────────────────────
     def _on_send(self):
         text = self.input_box.text().strip()
         if not text:
@@ -329,7 +315,8 @@ class MainWindow(QMainWindow):
         self._last_raw = text
         self._set_status("Thinking")
         self._set_enabled(False)
-        w = CommandWorker(text, confirmed=confirmed, intent=intent, args=args, skip_classify=skip)
+        w = CommandWorker(text, confirmed=confirmed, intent=intent,
+                         args=args, skip_classify=skip)
         w.finished_signal.connect(self._on_done)
         w.error_signal.connect(self._on_error)
         w.finished_signal.connect(lambda _: self._cleanup(w))
@@ -343,25 +330,22 @@ class MainWindow(QMainWindow):
 
         if response == "__STOP_SPEAKING__":
             speaker.stop()
-            self._append("NOVA", "Stopped speaking.")
+            msg = "Stopped speaking."
+            self._append("NOVA", msg)
             self._set_status("Idle")
-<<<<<<< HEAD
-            self._resume_wake()
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+            self._resume_inputs()
             return
 
         if response == "__CLEAR_CHAT__":
             self.chat_area.clear()
-            self._append("NOVA", "Chat cleared.")
+            msg = "Chat cleared."
+            self._append("NOVA", msg)
+            speaker.speak(msg)
             self._set_status("Idle")
-<<<<<<< HEAD
-            self._resume_wake()
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+            self._resume_inputs()
             return
 
-        # Timer
+        # Timer marker
         if response.startswith(TIMER_MARKER):
             rest  = response[len(TIMER_MARKER):]
             parts = rest.split("|", 1)
@@ -371,34 +355,27 @@ class MainWindow(QMainWindow):
             speaker.speak(label)
             self._start_timer(secs, label)
             self._set_status("Idle")
-<<<<<<< HEAD
-            self._resume_wake()
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+            self._resume_inputs()
             return
 
-        # Confirmation request
+        # Confirmation dialog
         is_confirm, intent, target, orig_args = is_confirmation_request(response)
         if is_confirm:
             self._set_status("Idle")
             self._show_confirm_dialog(intent, target, orig_args)
-<<<<<<< HEAD
-            # wake word resumes after confirm dialog finishes in _on_done again
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
             return
 
+        # Normal response — show AND speak it
         self._set_status("Speaking")
         self._append("NOVA", response)
         self._refresh_history()
         speaker.speak(response)
         self._set_status("Idle")
-<<<<<<< HEAD
-        self._resume_wake()
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+        self._resume_inputs()
 
     def _show_confirm_dialog(self, intent, target, orig_args):
+        ask_msg = f"Are you sure? Target: {target}"
+        speaker.speak(ask_msg)
         box = QMessageBox(self)
         box.setWindowTitle("Confirm Action")
         box.setText(f"Are you sure you want to proceed?\n\nTarget: {target}")
@@ -412,64 +389,116 @@ class MainWindow(QMainWindow):
     def _on_error(self, err: str):
         self._set_enabled(True)
         self._set_status("Error")
-        self._append("NOVA", f"Error: {err}")
-<<<<<<< HEAD
-        self._resume_wake()
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+        err_msg = f"Error: {err}"
+        self._append("NOVA", err_msg)
+        speaker.speak(err_msg)
+        self._resume_inputs()
 
     def _set_enabled(self, enabled: bool):
         self.send_btn.setEnabled(enabled)
         self.input_box.setEnabled(enabled)
         self.mic_btn.setEnabled(enabled)
 
+    def _resume_inputs(self):
+        """Re-enable hotkey + wake word after NOVA finishes."""
+        if hasattr(self, "hotkey_worker") and self.hotkey_worker.isRunning():
+            self.hotkey_worker.resume()
+        if hasattr(self, "wake_worker") and self.wake_worker.isRunning():
+            self.wake_worker.resume()
+
     def _cleanup(self, w):
         if w in self._active_workers:
             self._active_workers.remove(w)
 
-    # ── Voice ────────────────────────────────────────────────────────────────
+    # ── Mic button ────────────────────────────────────────────────────────────
     def _on_mic(self):
-        if not self.recorder.is_recording:
-            self.recorder.start()
-            self.mic_btn.setText("⏹")
-            self.mic_btn.setProperty("recording", "true")
-            self.mic_btn.setStyle(self.mic_btn.style())
-            self._set_status("Listening")
-        else:
-            path = self.recorder.stop()
-            self.mic_btn.setText("🎙")
-            self.mic_btn.setProperty("recording", "false")
-            self.mic_btn.setStyle(self.mic_btn.style())
-            self._set_status("Transcribing")
-            self._set_enabled(False)
-            w = TranscriptionWorker(path)
-            w.finished_signal.connect(self._on_transcript)
-            w.error_signal.connect(self._on_error)
-            w.finished_signal.connect(lambda _: self._cleanup(w))
-            w.error_signal.connect(lambda _: self._cleanup(w))
-            self._active_workers.append(w)
-            w.start()
+        self._start_recording()
+
+    def _start_recording(self):
+        if self._recording_now:
+            return
+        self._recording_now = True
+        self.recorder.start()
+        self.mic_btn.setText("⏹")
+        self._set_status("Listening")
+        speaker.speak("Listening")
+        QTimer.singleShot(4000, self._finish_recording)
+
+    def _finish_recording(self):
+        if not self._recording_now:
+            return
+        self._recording_now = False
+        path = self.recorder.stop()
+        self.mic_btn.setText("🎙")
+        self._set_status("Transcribing")
+        self._set_enabled(False)
+        w = TranscriptionWorker(path)
+        w.finished_signal.connect(self._on_transcript)
+        w.error_signal.connect(self._on_error)
+        w.finished_signal.connect(lambda _: self._cleanup(w))
+        w.error_signal.connect(lambda _: self._cleanup(w))
+        self._active_workers.append(w)
+        w.start()
 
     def _on_transcript(self, text: str):
         self._set_enabled(True)
         if not text.strip():
-            self._append("NOVA", "Didn't catch that — try again.")
+            not_caught = "Didn't catch that — try again."
+            self._append("NOVA", not_caught)
+            speaker.speak(not_caught)
             self._set_status("Idle")
+            self._resume_inputs()
             return
-        self.input_box.setText(text)
         self._append("You", text)
         self._run(text)
 
-    # ── Buttons ──────────────────────────────────────────────────────────────
     def _on_stop_speaking(self):
         speaker.stop()
         self._set_status("Idle")
 
     def _on_clear(self):
         self.chat_area.clear()
-        self._append("NOVA", "Chat cleared. How can I help?")
+        self._append("NOVA", "Chat cleared.")
 
-    # ── Stats polling ────────────────────────────────────────────────────────
+    # ── Hotkey ────────────────────────────────────────────────────────────────
+    def _start_hotkey(self):
+        self.hotkey_worker = HotkeyWorker()
+        self.hotkey_worker.detected_signal.connect(self._on_hotkey)
+        self.hotkey_worker.start()
+
+    def _on_hotkey(self):
+        self._append("NOVA", "Hotkey — listening...")
+        self._start_recording()
+
+    # ── Wake word (optional toggle) ───────────────────────────────────────────
+    def _start_wake_word(self):
+        self.wake_worker = WakeWordWorker()
+        self.wake_worker.detected_signal.connect(self._on_wake_word)
+        # NOT started yet — user must enable checkbox
+
+    def _on_wake_toggle(self, state):
+        enabled = bool(state)
+        if enabled:
+            if not self.wake_worker.isRunning():
+                self.wake_worker.start()
+            msg = "Wake word enabled. Say 'Hey NOVA' to activate."
+            self._append("NOVA", msg)
+            speaker.speak(msg)
+        else:
+            if self.wake_worker.isRunning():
+                self.wake_worker.stop()
+                self.wake_worker.wait(500)
+                self.wake_worker = WakeWordWorker()
+                self.wake_worker.detected_signal.connect(self._on_wake_word)
+            msg = "Wake word disabled."
+            self._append("NOVA", msg)
+            speaker.speak(msg)
+
+    def _on_wake_word(self):
+        self._append("NOVA", "Hey NOVA detected — listening...")
+        self._start_recording()
+
+    # ── Stats ─────────────────────────────────────────────────────────────────
     def _start_stats(self):
         self.stats_worker = StatsWorker()
         self.stats_worker.stats_signal.connect(self._on_stats)
@@ -481,7 +510,7 @@ class MainWindow(QMainWindow):
         self.battery_val.setText(f"{s['battery']}%" if s["battery"] is not None else "N/A")
         self.time_val.setText(s["time"])
 
-    # ── Weather ──────────────────────────────────────────────────────────────
+    # ── Weather ───────────────────────────────────────────────────────────────
     def _start_weather(self):
         self.wx_worker = WeatherWorker("Lahore")
         self.wx_worker.weather_signal.connect(self._on_weather)
@@ -492,7 +521,7 @@ class MainWindow(QMainWindow):
         self.wx_temp.setText(f"{d['temp']}°C (feels {d['feels']}°C)")
         self.wx_desc.setText(f"{d['desc']} · {d['humidity']}% humidity")
 
-    # ── Recent history ───────────────────────────────────────────────────────
+    # ── History ───────────────────────────────────────────────────────────────
     def _refresh_history(self):
         while self._hist_layout.count() > 1:
             item = self._hist_layout.takeAt(0)
@@ -506,47 +535,9 @@ class MainWindow(QMainWindow):
             lbl.setWordWrap(True)
             self._hist_layout.insertWidget(self._hist_layout.count() - 1, lbl)
 
-<<<<<<< HEAD
-    # ── Wake word ────────────────────────────────────────────────────────────
-    def _start_wake_word(self):
-        self.wake_worker = WakeWordWorker()
-        self.wake_worker.detected_signal.connect(self._on_wake_word)
-        self.wake_worker.start()
-        self._append("NOVA", "Wake word active — say 'Hey NOVA' to start listening.")
-
-    def _on_wake_word(self):
-        self._set_status("Listening")
-        self._append("NOVA", "Wake word detected — listening…")
-        self.recorder.start()
-        # Record for 4 seconds then auto-stop and transcribe
-        QTimer.singleShot(4000, self._auto_stop_recording)
-
-    def _auto_stop_recording(self):
-        if self.recorder.is_recording:
-            path = self.recorder.stop()
-            self._set_status("Transcribing")
-            self._set_enabled(False)
-            w = TranscriptionWorker(path)
-            w.finished_signal.connect(self._on_transcript_wake)
-            w.error_signal.connect(self._on_error)
-            w.finished_signal.connect(lambda _: self._cleanup(w))
-            w.error_signal.connect(lambda _: self._cleanup(w))
-            self._active_workers.append(w)
-            w.start()
-
-    def _on_transcript_wake(self, text: str):
-        self._set_enabled(True)
-        if not text.strip():
-            self._append("NOVA", "I heard the wake word but couldn't catch the command — say Hey NOVA again.")
-            self._set_status("Idle")
-            self._resume_wake()
-            return
-        self._append("You", text)
-        self._run(text)
-        # Note: _resume_wake is called inside _on_done after command finishes
-
     # ── Startup toggle ────────────────────────────────────────────────────────
     def _init_startup_btn(self):
+        from utils.startup import is_startup_enabled
         enabled = is_startup_enabled()
         self._startup_btn.setText("✓ Auto-start ON" if enabled else "Auto-start OFF")
         self._startup_btn.setStyleSheet(
@@ -554,26 +545,24 @@ class MainWindow(QMainWindow):
         )
 
     def _toggle_startup(self):
-        if is_startup_enabled():
-            msg = disable_startup()
-        else:
-            msg = enable_startup()
+        from utils.startup import enable_startup, disable_startup, is_startup_enabled
+        msg = disable_startup() if is_startup_enabled() else enable_startup()
         self._append("NOVA", msg)
+        speaker.speak(msg)
         self._init_startup_btn()
 
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
-    # ── Cleanup ──────────────────────────────────────────────────────────────
+    # ── Quit ─────────────────────────────────────────────────────────────────
     def real_quit(self):
         self.stats_worker.stop()
         self.wx_worker.stop()
-<<<<<<< HEAD
-        if hasattr(self, 'wake_worker'):
+        if self.wake_worker.isRunning():
             self.wake_worker.stop()
             self.wake_worker.wait(400)
-=======
->>>>>>> d62f4e2dc05d561969deec9ac1c3f93d18a72b06
+        if self.hotkey_worker.isRunning():
+            self.hotkey_worker.stop()
+            self.hotkey_worker.wait(400)
         self.stats_worker.wait(400)
         self.wx_worker.wait(400)
         speaker.stop()
+        stop_all_hotkeys()
         QApplication.quit()
