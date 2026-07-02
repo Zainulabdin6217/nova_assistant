@@ -101,6 +101,10 @@ def execute_tool(state: NovaState) -> dict:
             response = application_tools.open_file_explorer()
         elif intent == "open_browser":
             response = browser_tools.open_browser()
+        elif intent == "open_application":
+            response = application_tools.open_application(a.get("name") or args or "", a.get("text_to_type"))
+        elif intent == "write_text_to_window":
+            response = application_tools.type_text(a.get("text") or args or "")
 
         # ── Web/AI search ────────────────────────────────────
         elif intent == "search_google":
@@ -143,7 +147,7 @@ def execute_tool(state: NovaState) -> dict:
             response = info_tools.get_disk_usage()
 
         # ── File ops — real Windows paths ────────────────────────────
-        elif intent == "generate_and_write_file":
+        elif intent == "generate_and_save_file":
             response = file_tools.generate_and_write_file(
                 a.get("filename") or args or "document",
                 a.get("topic") or "",
@@ -159,7 +163,7 @@ def execute_tool(state: NovaState) -> dict:
             response = file_tools.list_files(a.get("location", "desktop"))
         elif intent == "delete_file":
             response = file_tools.delete_file(a.get("name") or args or "", a.get("location", "desktop"))
-        elif intent == "write_to_file":
+        elif intent == "save_text_to_file":
             response = file_tools.write_to_file(a.get("name") or "", a.get("content") or "", a.get("location", "desktop"))
         elif intent == "append_to_file":
             response = file_tools.append_to_file(a.get("name") or "", a.get("content") or "", a.get("location", "desktop"))

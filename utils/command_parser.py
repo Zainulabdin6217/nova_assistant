@@ -5,6 +5,8 @@ INTENTS = [
     ("open_calculator",    [r"open calculator"]),
     ("open_file_explorer", [r"open file explorer", r"open explorer"]),
     ("open_browser",       [r"open browser"]),
+    ("open_application",   [r"open (.+)"]),
+    ("write_text_to_window",[r"type (.+)", r"write (.+)"]),
     ("search_youtube",     [r"search youtube for (.+)", r"youtube (.+)"]),
     ("search_google",      [r"search google for (.+)", r"google (.+)"]),
     ("show_cpu",           [r"show cpu", r"cpu usage"]),

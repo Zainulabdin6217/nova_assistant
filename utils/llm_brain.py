@@ -28,6 +28,8 @@ TOOLS = [
     {"type":"function","function":{"name":"open_calculator","description":"Open Windows Calculator","parameters":{"type":"object","properties":{},"required":[]}}},
     {"type":"function","function":{"name":"open_file_explorer","description":"Open Windows File Explorer","parameters":{"type":"object","properties":{},"required":[]}}},
     {"type":"function","function":{"name":"open_browser","description":"Open the default web browser","parameters":{"type":"object","properties":{},"required":[]}}},
+    {"type":"function","function":{"name":"open_application","description":"Open any general Windows application (e.g. Microsoft Word, Excel, Chrome, Spotify) and optionally type text into it. CRITICAL: Use this if the user asks to open an app and write something IN IT, or if they ask to write something 'in Word', 'in Notepad', etc.","parameters":{"type":"object","properties":{"name":{"type":"string"},"text_to_type":{"type":"string"}},"required":["name"]}}},
+    {"type":"function","function":{"name":"write_text_to_window","description":"Type specific text into the currently active window. CRITICAL: Use this if the user asks to 'actually write' or 'type' into an OPENED application like Word or Notepad, or says 'write X in Word' when Word is already open.","parameters":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}},
     # Web/AI search
     {"type":"function","function":{"name":"search_google","description":"Search Google","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
     {"type":"function","function":{"name":"search_youtube","description":"Open YouTube search results (does NOT play video automatically)","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
@@ -49,13 +51,13 @@ TOOLS = [
     {"type":"function","function":{"name":"get_network_info","description":"Show IP address and network usage","parameters":{"type":"object","properties":{},"required":[]}}},
     {"type":"function","function":{"name":"get_disk_usage","description":"Show disk space for all drives","parameters":{"type":"object","properties":{},"required":[]}}},
     # Files — work on REAL Windows paths (desktop, downloads, documents, pictures, videos, music)
-    {"type":"function","function":{"name":"generate_and_write_file","description":"Use AI to WRITE an essay, story, letter, poem, assignment, report or any content and save it as a real file on the desktop. Use when user says write essay, write a letter, write a story, create a document about X etc.","parameters":{"type":"object","properties":{"filename":{"type":"string","description":"filename e.g. essay_on_my_father"},"topic":{"type":"string","description":"full writing prompt e.g. Write a 400-word heartfelt essay about my father"},"location":{"type":"string","description":"desktop downloads documents pictures videos music","default":"desktop"}},"required":["filename","topic"]}}},
+    {"type":"function","function":{"name":"generate_and_save_file","description":"Use AI to generate long-form text and save it silently as a background file on the disk. DO NOT use this if the user asks to open Microsoft Word or another app to write it.","parameters":{"type":"object","properties":{"filename":{"type":"string","description":"filename e.g. essay_on_my_father"},"topic":{"type":"string","description":"full writing prompt e.g. Write a 400-word heartfelt essay about my father"},"location":{"type":"string","description":"desktop downloads documents pictures videos music","default":"desktop"}},"required":["filename","topic"]}}},
     {"type":"function","function":{"name":"create_folder","description":"Create a folder on desktop or any real Windows location","parameters":{"type":"object","properties":{"name":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name"]}}},
     {"type":"function","function":{"name":"create_file","description":"Create an empty text file on desktop or any Windows location","parameters":{"type":"object","properties":{"name":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name"]}}},
     {"type":"function","function":{"name":"read_file","description":"Read a text file from desktop downloads documents etc.","parameters":{"type":"object","properties":{"name":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name"]}}},
     {"type":"function","function":{"name":"list_files","description":"List files in desktop downloads documents pictures videos music or any folder","parameters":{"type":"object","properties":{"location":{"type":"string","default":"desktop"}},"required":[]}}},
     {"type":"function","function":{"name":"delete_file","description":"Delete a file from desktop or any location","parameters":{"type":"object","properties":{"name":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name"]}}},
-    {"type":"function","function":{"name":"write_to_file","description":"Write specific text to a file on desktop or any location","parameters":{"type":"object","properties":{"name":{"type":"string"},"content":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name","content"]}}},
+    {"type":"function","function":{"name":"save_text_to_file","description":"Write specific text to a background file on the disk. DO NOT use this to type text into an application like Word, Notepad, or Excel.","parameters":{"type":"object","properties":{"name":{"type":"string"},"content":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name","content"]}}},
     {"type":"function","function":{"name":"append_to_file","description":"Add text to end of a file","parameters":{"type":"object","properties":{"name":{"type":"string"},"content":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name","content"]}}},
     {"type":"function","function":{"name":"open_with_app","description":"Open any file PDF Word image video audio text with its default Windows application","parameters":{"type":"object","properties":{"name":{"type":"string"},"location":{"type":"string","default":"desktop"}},"required":["name"]}}},
     {"type":"function","function":{"name":"open_folder","description":"Open a folder in Windows File Explorer e.g. open desktop folder open downloads","parameters":{"type":"object","properties":{"location":{"type":"string","default":"desktop"}},"required":[]}}},
@@ -103,13 +105,13 @@ TOOLS = [
 OLLAMA_INTENT_PROMPT = """You are NOVA, a Windows desktop assistant. Classify the user message into ONE intent.
 For greetings or conversation use intent "chat" and write a short friendly reply.
 
-Intents: open_notepad, open_calculator, open_file_explorer, open_browser,
+Intents: open_notepad, open_calculator, open_file_explorer, open_browser, open_application, write_text_to_window,
 search_google, search_youtube, play_youtube, search_chatgpt, search_gemini, search_perplexity,
 search_claude, search_copilot, search_grok, search_phind,
 get_system_specs, show_cpu, show_ram, show_battery, show_time, take_screenshot,
 get_network_info, get_disk_usage,
 create_folder, create_file, read_file, list_files, delete_file,
-write_to_file, append_to_file, move_file, copy_file, rename_file, search_in_files,
+save_text_to_file, append_to_file, move_file, copy_file, rename_file, search_in_files,
 create_note, show_notes, delete_note,
 volume_up, volume_down, volume_mute, volume_unmute, get_volume, set_volume,
 lock_computer, sleep_computer, shutdown_computer, restart_computer, cancel_shutdown, kill_process,
@@ -123,11 +125,15 @@ Reply ONLY with valid JSON:
 Examples:
 "hey open notepad" -> {"intent":"open_notepad","args":null,"reply":null}
 "Show CPUs usage" -> {"intent":"show_cpu","args":null,"reply":null}
+"open microsoft word and write a letter" -> {"intent":"open_application","args":"{\"name\":\"Microsoft Word\",\"text_to_type\":\"Dear Sir/Madam,\"}","reply":null}
+"write hi in word" -> {"intent":"open_application","args":"{\"name\":\"Word\",\"text_to_type\":\"hi\"}","reply":null}
+"type hello world" -> {"intent":"write_text_to_window","args":"hello world","reply":null}
+"write some text in the word" -> {"intent":"write_text_to_window","args":"some text","reply":null}
 "search youtube for python tutorials" -> {"intent":"search_youtube","args":"python tutorials","reply":null}
 "play peaceful songs on youtube" -> {"intent":"play_youtube","args":"peaceful songs","reply":null}
 "play despacito" -> {"intent":"play_youtube","args":"despacito","reply":null}
 "move test.txt from workspace to desktop" -> {"intent":"move_file","args":"{\\"name\\":\\"test.txt\\",\\"source\\":\\"workspace\\",\\"destination\\":\\"desktop\\"}","reply":null}
-"write hello world to notes.txt" -> {"intent":"write_to_file","args":"{\\"name\\":\\"notes.txt\\",\\"content\\":\\"hello world\\"}","reply":null}
+"write hello world to notes.txt" -> {"intent":"save_text_to_file","args":"{\"name\":\"notes.txt\",\"content\":\"hello world\"}","reply":null}
 "rename old.txt to new.txt" -> {"intent":"rename_file","args":"{\\"old_name\\":\\"old.txt\\",\\"new_name\\":\\"new.txt\\"}","reply":null}
 "set volume to 60" -> {"intent":"set_volume","args":"60","reply":null}
 "translate to Urdu" -> {"intent":"translate_text","args":"Urdu","reply":null}
@@ -141,8 +147,9 @@ MAX_HISTORY = 10
 
 MULTI_ARG_TOOLS = {
     "move_file", "copy_file", "rename_file",
-    "write_to_file", "append_to_file",
+    "save_text_to_file", "append_to_file",
     "read_file", "list_files", "delete_file",
+    "open_application", "generate_and_save_file"
 }
 
 
@@ -182,7 +189,7 @@ def _extract_args(fn_name: str, fn_args: dict) -> str | None:
     return (
         fn_args.get("query") or fn_args.get("name") or fn_args.get("content")
         or fn_args.get("topic") or fn_args.get("city") or fn_args.get("keyword")
-        or fn_args.get("language") or fn_args.get("duration") or None
+        or fn_args.get("language") or fn_args.get("duration") or fn_args.get("text") or None
     )
 
 
